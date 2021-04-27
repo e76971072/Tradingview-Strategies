@@ -1,0 +1,88 @@
+//@version=4
+study("Option Scalp by Kevin", "Option Scalp by Kevin Nguyen ", overlay = true)
+
+start = input(title = "Start", defval = 0.02, step = 0.001)
+increment = input(title = "Increment", defval = 0.02, step = 0.001)
+maximum = input(title = "Max Value", defval = 0.2, step = 0.01)
+putlabel = input(title = "Put Labels", defval = true)
+
+sbcFilt = input(true, title="Show Text Plot For Filtered Entry")
+highlightState = input(title="Highlight State ?", type=input.bool, defval=true)
+var color longColor = color.green
+var color shortColor = color.red
+
+
+int trend = 0
+float sar = 0.0
+float ep = 0.0
+float af = 0.0
+
+trend := nz(trend[1])
+ep := nz(ep[1])
+af :=nz(af[1])
+sar := sar[1]
+
+if trend == 0 and not na(high[1])
+    trend := high >= high[1] or low >= low[1] ? 1 : -1
+    sar := trend > 0 ? low[1] : high[1]
+    ep := trend > 0 ? high[1] : low[1]
+    af := start
+else 
+    nextsar = sar
+    if trend > 0
+        if high[1] > ep
+            ep := high[1]
+            af := min(maximum, af + increment)
+            
+        nextsar := sar + af * (ep - sar)
+        nextsar := min(min(low[1], low[2]), nextsar)
+        
+        //Reversal
+        if nextsar > low
+            trend := -1
+            nextsar := ep
+            ep := low
+            af := start
+    else 
+        if low[1] < ep
+            ep := low[1]
+            af := min(maximum, af + increment)
+        
+        nextsar := sar + af * (ep - sar)
+        nextsar := max(max(high[1], high[2]), nextsar)
+        
+        //Reversal
+        if nextsar < high
+            trend := 1
+            nextsar := ep
+            ep := high
+            af := start
+    sar := nextsar
+
+
+
+
+psarPlot = plot(sar, title = "", color = trend > 0 ? color.green : color.red, linewidth = 2, style = plot.style_circles, transp= 50)
+plotshape(sbcFilt, title="Filtered Entry Text", color= trend > 0 ? color.green : na , style= shape.arrowup , location= location.belowbar,transp=0)
+
+
+midPricePlot = plot(ohlc4, title="", display=display.none)
+fillColor = highlightState ? ( trend  == 1  ? longColor : shortColor) : na
+// Fill the gap area of the PSAR 
+fill(midPricePlot, psarPlot, title="Trade State Filling", color=fillColor, transp=70) 
+
+
+
+plotshape(sbcFilt, title="Filtered Entry Text", color= trend <  0 ? color.red : na , style= shape.arrowdown , location= location.abovebar, transp=0)
+alertcondition(change(trend) > 0, title='PSAR Trend UP', message='PSAR Trend UP') // trend switching 
+alertcondition(change(trend) < 0, title='PSAR Trend DOWN', message='PSAR Trend DOWN')
+
+if change(trend) > 0 and putlabel
+    label.new(bar_index, sar, color = color.lime, style=label.style_labelup, size = size.tiny, text= "Long Call")
+if change(trend) < 0 and putlabel
+    label.new(bar_index, sar, color = color.red, style=label.style_labeldown, size = size.tiny, text= "Long Put")
+    
+
+
+
+
